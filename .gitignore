@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtualenvs
+venv/
+.venv/
+env/
+
+# Environment / secrets
+.env
+
+# Flask instance folder
+instance/
+
+# Local file store
+uploads/
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
