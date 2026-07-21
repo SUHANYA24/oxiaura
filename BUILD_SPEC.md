@@ -141,6 +141,7 @@ Build these nine tables as SQLAlchemy models. Types shown are the intent; use ap
 | email | string(150) | nullable |
 | assigned_rep_id | int FK → users.id | |
 | status | enum | pending / verified / flagged |
+| is_deleted | bool | default false, indexed — soft delete (added in Phase 4) |
 | registered_at | datetime | |
 
 ### `documents`
