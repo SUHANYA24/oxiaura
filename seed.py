@@ -13,18 +13,10 @@ repeatedly during development.
 
 import os
 
-import bcrypt
-
 from app import create_app
 from app.extensions import db
 from app.models import Branch, Customer, CustomerStatus, User, UserRole
-
-
-def _hash_password(plain: str) -> str:
-    """bcrypt hash (cost 12) — matches the Phase 3 security helper contract."""
-    return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode(
-        "utf-8"
-    )
+from app.utils.security import hash_password as _hash_password
 
 
 def _get_or_create_user(**kwargs) -> User:
