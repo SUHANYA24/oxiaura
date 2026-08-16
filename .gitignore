@@ -36,3 +36,5 @@ htmlcov/
 .DS_Store
 
 .claude/
+graphify-out/
+claude.md
