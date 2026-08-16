@@ -38,6 +38,15 @@ class BaseConfig:
     MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "10"))
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
 
+    # --- Fraud detection (Phase 6) ---
+    # A document is flagged when its weighted aggregate score exceeds this.
+    FRAUD_FLAG_THRESHOLD = float(os.environ.get("FRAUD_FLAG_THRESHOLD", "60"))
+    # Optional trained-model weights. When unset, the CNN/Siamese detectors fall
+    # back to deterministic mock scores (BUILD_SPEC Phase 6 note; real weights
+    # are swapped in at Phase 6b).
+    FRAUD_CNN_WEIGHTS = os.environ.get("FRAUD_CNN_WEIGHTS") or None
+    FRAUD_SIAMESE_WEIGHTS = os.environ.get("FRAUD_SIAMESE_WEIGHTS") or None
+
     # --- CORS (locked down in Phase 11) ---
     CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
 

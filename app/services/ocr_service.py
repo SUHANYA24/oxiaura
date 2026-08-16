@@ -17,7 +17,7 @@ from ..ai.ocr import extractor, preprocessor
 from ..extensions import db
 from ..models import Customer, DocType, Document, User
 from ..utils import file_handler
-from . import customer_service
+from . import customer_service, fraud_service
 from .errors import NotFoundError, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -49,10 +49,21 @@ def _apply_ocr(document: Document) -> None:
         document.ocr_confidence = None
 
 
+def _apply_fraud(document: Document) -> None:
+    """Run the fraud pipeline for ``document`` (does not commit).
+
+    Guarded like OCR: a detector failure must not discard the upload.
+    """
+    try:
+        fraud_service.analyze_document(document)
+    except Exception:  # noqa: BLE001 - keep the upload; record nothing on failure
+        logger.exception("Fraud analysis failed for document %s", document.id)
+
+
 def upload_document(
     customer_id: int, doc_type_value: str, file_storage, current_user: User
 ) -> Document:
-    """Validate, store, and OCR an uploaded document for a customer.
+    """Validate, store, OCR, and fraud-check an uploaded document for a customer.
 
     :raises NotFoundError / ForbiddenError: propagated from the customer scope
         check (a sales_rep may only upload for their own customers).
@@ -79,8 +90,10 @@ def upload_document(
         sha256_hash=sha256_hash,
     )
     _apply_ocr(document)
-
     db.session.add(document)
+    db.session.flush()  # assign document.id before fraud analysis / notifications
+    _apply_fraud(document)
+
     db.session.commit()
     return document
 
