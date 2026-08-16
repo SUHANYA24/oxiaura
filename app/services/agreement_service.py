@@ -29,7 +29,7 @@ from sqlalchemy import select
 from ..extensions import db
 from ..models import Agreement, AgreementStatus, Customer, User
 from ..utils import qr_generator
-from . import customer_service
+from . import customer_service, employee_service
 from .errors import NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -134,6 +134,9 @@ def generate_agreement(data: dict, current_user: User) -> Agreement:
 
     pdf_bytes = _render_pdf(agreement, customer, current_user)
     agreement.pdf_path = _store_pdf(pdf_bytes)
+
+    # KPI: credit the customer's assigned rep with this agreement's revenue.
+    employee_service.record_revenue(customer.assigned_rep_id, agreement.investment_amount)
 
     db.session.commit()
     logger.info(

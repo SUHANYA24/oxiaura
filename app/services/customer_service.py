@@ -14,6 +14,7 @@ from sqlalchemy import or_, select
 
 from ..extensions import db
 from ..models import Customer, CustomerStatus, User, UserRole
+from . import employee_service
 from .errors import ConflictError, ForbiddenError, NotFoundError, ValidationError
 
 # Customer codes look like "C-1041". New codes start here and increment.
@@ -90,6 +91,8 @@ def create_customer(data: dict, current_user: User) -> Customer:
         status=CustomerStatus.pending,
     )
     db.session.add(customer)
+    # KPI: credit the assigned rep with a registered customer this month.
+    employee_service.record_customer_registered(assigned_rep_id)
     db.session.commit()
     return customer
 
