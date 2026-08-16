@@ -19,6 +19,10 @@ class BaseConfig:
     # --- Core secrets ---
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-insecure-change-me")
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-insecure-jwt-change-me")
+    # Signs agreement QR tokens (Phase 8). Falls back to SECRET_KEY so dev boots.
+    QR_SECRET_KEY = os.environ.get("QR_SECRET_KEY") or os.environ.get(
+        "SECRET_KEY", "dev-insecure-change-me"
+    )
 
     # --- Database ---
     SQLALCHEMY_DATABASE_URI = os.environ.get(
@@ -47,6 +51,9 @@ class BaseConfig:
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
     MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "10"))
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
+
+    # --- Generated agreement PDFs (Phase 8) ---
+    AGREEMENTS_FOLDER = os.environ.get("AGREEMENTS_FOLDER", "agreements")
 
     # --- Fraud detection (Phase 6) ---
     # A document is flagged when its weighted aggregate score exceeds this.

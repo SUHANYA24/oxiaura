@@ -89,6 +89,7 @@ def _init_jwt(app: Flask) -> None:
 
 
 def _register_blueprints(app: Flask) -> None:
+    from .routes.agreements import agreements_bp
     from .routes.auth import auth_bp
     from .routes.customers import customers_bp
     from .routes.documents import documents_bp
@@ -98,3 +99,4 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(auth_bp, url_prefix=API_PREFIX)
     app.register_blueprint(customers_bp, url_prefix=API_PREFIX)
     app.register_blueprint(documents_bp, url_prefix=API_PREFIX)
+    app.register_blueprint(agreements_bp, url_prefix=API_PREFIX)
