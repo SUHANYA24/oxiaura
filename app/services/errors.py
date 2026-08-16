@@ -43,3 +43,10 @@ class ValidationError(ServiceError):
 
     status = 422
     error = "validation_error"
+
+
+class UnsupportedMediaError(ServiceError):
+    """An uploaded file has a disallowed / unrecognized media type."""
+
+    status = 415
+    error = "unsupported_media_type"
