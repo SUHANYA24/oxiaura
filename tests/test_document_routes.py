@@ -91,18 +91,31 @@ def _upload(client, headers, customer_id, *, doc_type="bank_slip", content=None,
 
 
 class TestUpload:
-    def test_upload_returns_extracted_fields_and_confidence(self, client, admin_h):
+    def test_upload_queues_job_and_returns_task_id(self, client, admin_h):
         cid = _make_customer(client, admin_h)
         resp = _upload(client, admin_h, cid)
-        assert resp.status_code == 201, resp.get_json()
+        assert resp.status_code == 202, resp.get_json()
         body = resp.get_json()
 
         assert body["customer_id"] == cid
         assert body["doc_type"] == "bank_slip"
         assert body["verification_status"] == "pending"
+        assert body["status"] == "processing"
+        assert body["task_id"]
+        # The metadata response never carries the OCR payload.
+        assert "extracted_fields" not in body
+
+    def test_results_available_after_processing(self, client, admin_h):
+        # Celery runs eagerly under TestConfig, so the job completes inline and
+        # the extracted fields are ready as soon as the upload returns.
+        cid = _make_customer(client, admin_h)
+        doc_id = _upload(client, admin_h, cid).get_json()["id"]
+
+        resp = client.get(f"/api/v1/documents/{doc_id}/ocr-result", headers=admin_h)
+        assert resp.status_code == 200
+        body = resp.get_json()
         # mean of the six stubbed confidences.
         assert body["ocr_confidence"] == pytest.approx(0.928, abs=1e-3)
-
         fields = body["extracted_fields"]["fields"]
         assert fields["nic_number"]["value"] == "912345678V"
         assert fields["name"]["value"] == "Nimal Perera"
@@ -166,7 +179,7 @@ class TestAccessScope:
 
     def test_rep_can_upload_for_own_customer(self, client, rep_h):
         cid = _make_customer(client, rep_h, nic="900000000051")
-        assert _upload(client, rep_h, cid).status_code == 201
+        assert _upload(client, rep_h, cid).status_code == 202
 
 
 class TestRetrieve:

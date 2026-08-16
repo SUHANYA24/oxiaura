@@ -33,6 +33,16 @@ class BaseConfig:
     # --- Redis / Celery broker (wired in Phase 7) ---
     REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
+    # Celery moves OCR + fraud off the request thread. Broker and result backend
+    # both use Redis; task results are kept so the job-status endpoint can poll.
+    CELERY = {
+        "broker_url": REDIS_URL,
+        "result_backend": REDIS_URL,
+        "task_ignore_result": False,
+        "task_track_started": True,
+        "broker_connection_retry_on_startup": True,
+    }
+
     # --- File uploads (used from Phase 5) ---
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
     MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "10"))
@@ -68,6 +78,17 @@ class TestConfig(BaseConfig):
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "TEST_DATABASE_URL", "sqlite:///:memory:"
     )
+
+    # Run Celery tasks synchronously in-process — no Redis broker/worker needed.
+    # Eager results are stored in an in-memory backend so the job-status
+    # endpoint can still be exercised, and exceptions propagate to the caller.
+    CELERY = {
+        "broker_url": "memory://",
+        "result_backend": "cache+memory://",
+        "task_always_eager": True,
+        "task_eager_propagates": True,
+        "task_store_eager_result": True,
+    }
 
 
 # Factory looks the requested environment up here.

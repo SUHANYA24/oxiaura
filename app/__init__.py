@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify
 
 from .config import config_map
-from .extensions import cors, db, jwt, ma, migrate
+from .extensions import celery_init_app, cors, db, jwt, ma, migrate
 
 # Load environment variables from .env as early as possible.
 load_dotenv()
@@ -43,6 +43,11 @@ def _init_extensions(app: Flask) -> None:
     _init_jwt(app)
     ma.init_app(app)
     cors.init_app(app)
+
+    # Celery (Phase 7): create the app-bound Celery instance and import the task
+    # module so ``@shared_task`` definitions register on it.
+    celery_init_app(app)
+    from .tasks import celery_tasks  # noqa: F401
 
 
 def _init_jwt(app: Flask) -> None:

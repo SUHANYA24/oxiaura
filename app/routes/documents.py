@@ -7,14 +7,14 @@ ORM -> schema response. Uploads are ``multipart/form-data`` (form fields +
 service via the customer scope check.
 """
 
-from flask import Blueprint, jsonify, request
+from celery.result import AsyncResult
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import get_jwt_identity
 from marshmallow import ValidationError as SchemaValidationError
 
 from ..extensions import db
 from ..models import User, UserRole
 from ..schemas.document_schema import (
-    document_detail_schema,
     document_response_schema,
     document_upload_schema,
     document_verify_schema,
@@ -23,6 +23,7 @@ from ..schemas.document_schema import (
 )
 from ..services import fraud_service, ocr_service
 from ..services.errors import ServiceError
+from ..tasks.celery_tasks import process_document
 from ..utils.security import role_required
 
 documents_bp = Blueprint("documents", __name__)
@@ -45,14 +46,20 @@ def _validation_error(err: SchemaValidationError):
 @documents_bp.post("/documents/upload")
 @role_required(_ALL_ROLES)
 def upload_document():
-    """Upload a document -> store it -> run OCR -> return metadata + fields."""
+    """Store an upload, queue the OCR + fraud job, and return the job id.
+
+    The file is validated and stored on the request thread so the client gets a
+    document id and integrity hash immediately; OCR + fraud run asynchronously
+    on a Celery worker (BUILD_SPEC Phase 7). Poll ``GET /documents/{id}`` or
+    ``GET /documents/jobs/{task_id}`` for the results.
+    """
     try:
         data = document_upload_schema.load(request.form.to_dict())
     except SchemaValidationError as err:
         return _validation_error(err)
 
     try:
-        document = ocr_service.upload_document(
+        document = ocr_service.create_document(
             customer_id=data["customer_id"],
             doc_type_value=data["doc_type"].value,
             file_storage=request.files.get("file"),
@@ -61,7 +68,28 @@ def upload_document():
     except ServiceError as err:
         return _service_error(err)
 
-    return jsonify(document_detail_schema.dump(document)), 201
+    async_result = process_document.delay(document.id)
+
+    payload = document_response_schema.dump(document)
+    payload["status"] = "processing"
+    payload["task_id"] = async_result.id
+    return jsonify(payload), 202
+
+
+@documents_bp.get("/documents/jobs/<task_id>")
+@role_required(_ALL_ROLES)
+def job_status(task_id: str):
+    """Report the state (and result, when ready) of a queued processing job."""
+    celery_app = current_app.extensions["celery"]
+    result = AsyncResult(task_id, app=celery_app)
+
+    body = {"task_id": task_id, "state": result.state}
+    if result.ready():
+        if result.successful():
+            body["result"] = result.result
+        else:
+            body["error"] = str(result.result)
+    return jsonify(body), 200
 
 
 @documents_bp.get("/documents/<int:document_id>")

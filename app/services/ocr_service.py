@@ -4,9 +4,10 @@ Flow (BUILD_SPEC Phase 5): validate customer access -> validate + store the
 file (UUID name, SHA-256) -> create the ``documents`` row -> preprocess ->
 OCR -> parse fields -> persist ``extracted_fields`` + ``ocr_confidence``.
 
-The extraction runs synchronously in this phase; Phase 7 moves the
-``run_ocr_pipeline`` call onto a Celery worker without changing the storage or
-access-control logic here. Business logic only — no Flask HTTP types.
+Phase 7 splits this into two halves: :func:`create_document` does the fast,
+request-thread work (access check, storage, DB row) and :func:`process_document`
+runs the heavy OCR + fraud pipeline, invoked by a Celery worker off the request
+thread. Business logic only — no Flask HTTP types.
 """
 
 from __future__ import annotations
@@ -63,7 +64,24 @@ def _apply_fraud(document: Document) -> None:
 def upload_document(
     customer_id: int, doc_type_value: str, file_storage, current_user: User
 ) -> Document:
-    """Validate, store, OCR, and fraud-check an uploaded document for a customer.
+    """Deprecated synchronous upload (pre-Phase 7).
+
+    Retained for callers/tests that still want the whole pipeline inline. The
+    HTTP upload route now uses :func:`create_document` + a Celery task instead.
+    """
+    document = create_document(customer_id, doc_type_value, file_storage, current_user)
+    return process_document(document.id)
+
+
+def create_document(
+    customer_id: int, doc_type_value: str, file_storage, current_user: User
+) -> Document:
+    """Validate + store an uploaded document, without running OCR/fraud.
+
+    This is the synchronous half of the Phase 7 flow: it does only the fast,
+    request-thread work (access check, file validation, storage, DB row) and
+    commits so the document has an id. The heavy OCR + fraud pipeline is run
+    afterwards by :func:`process_document` on a Celery worker.
 
     :raises NotFoundError / ForbiddenError: propagated from the customer scope
         check (a sales_rep may only upload for their own customers).
@@ -89,11 +107,26 @@ def upload_document(
         file_path=file_path,
         sha256_hash=sha256_hash,
     )
-    _apply_ocr(document)
     db.session.add(document)
-    db.session.flush()  # assign document.id before fraud analysis / notifications
-    _apply_fraud(document)
+    db.session.commit()
+    return document
 
+
+def process_document(document_id: int) -> Document | None:
+    """Run OCR + fraud for a stored document and persist the results.
+
+    Called from the Celery task (no HTTP context, no access check — the row was
+    already access-checked at upload time). Returns the updated document, or
+    ``None`` if it no longer exists.
+    """
+    document = db.session.get(Document, document_id)
+    if document is None:
+        logger.warning("process_document: document %s not found", document_id)
+        return None
+
+    _apply_ocr(document)
+    db.session.flush()  # ensure document.id is available for fraud/notifications
+    _apply_fraud(document)
     db.session.commit()
     return document
 
