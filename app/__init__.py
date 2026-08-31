@@ -96,6 +96,7 @@ def _register_blueprints(app: Flask) -> None:
     from .routes.documents import documents_bp
     from .routes.employees import employees_bp
     from .routes.health import health_bp
+    from .routes.products import products_bp
     from .routes.proposals import proposals_bp
     from .routes.reports import reports_bp
     from .routes.users import users_bp
@@ -106,6 +107,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(customers_bp, url_prefix=API_PREFIX)
     app.register_blueprint(documents_bp, url_prefix=API_PREFIX)
     app.register_blueprint(agreements_bp, url_prefix=API_PREFIX)
+    app.register_blueprint(products_bp, url_prefix=API_PREFIX)
     app.register_blueprint(proposals_bp, url_prefix=API_PREFIX)
     app.register_blueprint(employees_bp, url_prefix=API_PREFIX)
     app.register_blueprint(reports_bp, url_prefix=API_PREFIX)

@@ -25,6 +25,45 @@ def _str_env(key: str, default: str) -> str:
     return value.strip() if value and value.strip() else default
 
 
+def _celery_settings(redis_url: str, eager: bool) -> dict:
+    """Celery settings for a real broker, or for running with no broker at all.
+
+    ``eager`` swaps Redis out for in-process execution: ``.delay()`` runs the task
+    on the calling thread and returns a finished result. Nothing connects to
+    Redis, so no ``redis-server`` and no ``celery worker`` are needed — which is
+    what makes the app runnable on a machine without either.
+
+    Both URLs have to move, not just the broker. ``.delay()`` skips the broker
+    under ``task_always_eager``, but ``GET /documents/jobs/<task_id>`` builds an
+    ``AsyncResult``, and that reads the *result backend* — leave it pointing at
+    Redis and job polling still raises ConnectionError.
+
+    The cost is that OCR + fraud then run inside the HTTP request. On CPU that is
+    seconds to tens of seconds for the first upload (EasyOCR loads its models),
+    and the request blocks for all of it.
+    """
+    if eager:
+        return {
+            "broker_url": "memory://",
+            "result_backend": "cache+memory://",
+            "task_always_eager": True,
+            # False, so a failing task is recorded as FAILURE and polled for like
+            # any other — rather than escaping into the upload response as a 500.
+            # This keeps the endpoint's contract identical in both modes.
+            "task_eager_propagates": False,
+            "task_store_eager_result": True,
+            "task_ignore_result": False,
+            "task_track_started": True,
+        }
+    return {
+        "broker_url": redis_url,
+        "result_backend": redis_url,
+        "task_ignore_result": False,
+        "task_track_started": True,
+        "broker_connection_retry_on_startup": True,
+    }
+
+
 class BaseConfig:
     """Settings shared by every environment."""
 
@@ -49,15 +88,16 @@ class BaseConfig:
     # --- Redis / Celery broker (wired in Phase 7) ---
     REDIS_URL = _str_env("REDIS_URL", "redis://localhost:6379/0")
 
+    # CELERY_EAGER=1 runs OCR + fraud in-process instead of on a worker, with no
+    # Redis involved. Set it when you have no broker running: without it,
+    # ``POST /documents/upload`` stores the file and then fails with
+    # "Error 10061 connecting to localhost:6379" from ``process_document.delay``,
+    # leaving a document row behind that nothing will ever process.
+    CELERY_EAGER = _bool_env("CELERY_EAGER", False)
+
     # Celery moves OCR + fraud off the request thread. Broker and result backend
     # both use Redis; task results are kept so the job-status endpoint can poll.
-    CELERY = {
-        "broker_url": REDIS_URL,
-        "result_backend": REDIS_URL,
-        "task_ignore_result": False,
-        "task_track_started": True,
-        "broker_connection_retry_on_startup": True,
-    }
+    CELERY = _celery_settings(REDIS_URL, CELERY_EAGER)
 
     # --- File uploads (used from Phase 5) ---
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
@@ -91,6 +131,11 @@ class DevConfig(BaseConfig):
 class ProdConfig(BaseConfig):
     DEBUG = False
     TESTING = False
+    # Production always uses a real broker, whatever CELERY_EAGER says. Eager mode
+    # would run a multi-second OCR pass inside the HTTP request, holding a worker
+    # thread per upload and timing clients out under any real load.
+    CELERY_EAGER = False
+    CELERY = _celery_settings(BaseConfig.REDIS_URL, eager=False)
 
 
 class TestConfig(BaseConfig):
@@ -100,9 +145,10 @@ class TestConfig(BaseConfig):
     # without a MySQL instance.
     SQLALCHEMY_DATABASE_URI = _str_env("TEST_DATABASE_URL", "sqlite:///:memory:")
 
-    # Run Celery tasks synchronously in-process — no Redis broker/worker needed.
-    # Eager results are stored in an in-memory backend so the job-status
-    # endpoint can still be exercised, and exceptions propagate to the caller.
+    # Always eager, ignoring CELERY_EAGER: the suite must not depend on a broker.
+    # Unlike dev, exceptions propagate, so a task that breaks fails its test
+    # loudly instead of hiding in a result the test never polls.
+    CELERY_EAGER = True
     CELERY = {
         "broker_url": "memory://",
         "result_backend": "cache+memory://",

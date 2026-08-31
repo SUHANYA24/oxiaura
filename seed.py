@@ -4,6 +4,7 @@ Inserts a baseline dataset so the app is usable immediately after migration:
   * one admin user (and one sample sales rep so customers have a valid rep)
   * two branches
   * a few sample customers
+  * the starter product catalog (admin-managed reference data)
 
 Run with:  python seed.py   (or:  flask --app wsgi shell < seed.py)
 
@@ -15,7 +16,15 @@ import os
 
 from app import create_app
 from app.extensions import db
-from app.models import Branch, Customer, CustomerStatus, User, UserRole
+from app.models import (
+    Branch,
+    Customer,
+    CustomerStatus,
+    Product,
+    ProductCategory,
+    User,
+    UserRole,
+)
 from app.utils.security import hash_password as _hash_password
 
 
@@ -47,6 +56,16 @@ def _get_or_create_customer(customer_code: str, **kwargs) -> Customer:
     db.session.add(customer)
     db.session.flush()
     return customer
+
+
+def _get_or_create_product(product_code: str, **kwargs) -> Product:
+    product = Product.query.filter_by(product_code=product_code).first()
+    if product:
+        return product
+    product = Product(product_code=product_code, **kwargs)
+    db.session.add(product)
+    db.session.flush()
+    return product
 
 
 def seed() -> None:
@@ -113,6 +132,41 @@ def seed() -> None:
         status=CustomerStatus.flagged,
     )
 
+    # --- Starter product catalog (admin-managed reference data) ---
+    _get_or_create_product(
+        "PRD-1001",
+        name="Teak Plantation Unit",
+        category=ProductCategory.teak,
+        description="15-year teak growth unit with annual yield reporting.",
+        min_investment=50000,
+        max_investment=500000,
+        duration_months=180,
+        interest_rate=12.5,
+        is_active=True,
+    )
+    _get_or_create_product(
+        "PRD-1002",
+        name="Agarwood Growth Unit",
+        category=ProductCategory.agarwood,
+        description="20-year agarwood unit, higher return and longer lock-in.",
+        min_investment=100000,
+        max_investment=1000000,
+        duration_months=240,
+        interest_rate=14.0,
+        is_active=True,
+    )
+    _get_or_create_product(
+        "PRD-1003",
+        name="Coconut Estate Share",
+        category=ProductCategory.coconut,
+        description="10-year coconut estate share with quarterly payouts.",
+        min_investment=25000,
+        max_investment=None,
+        duration_months=120,
+        interest_rate=9.75,
+        is_active=True,
+    )
+
     db.session.commit()
 
     print("Seed complete:")
@@ -120,6 +174,7 @@ def seed() -> None:
     print(f"  sales rep  : {rep.email} (password: {rep_password})")
     print(f"  branches   : {Branch.query.count()}")
     print(f"  customers  : {Customer.query.count()}")
+    print(f"  products   : {Product.query.count()}")
 
 
 if __name__ == "__main__":

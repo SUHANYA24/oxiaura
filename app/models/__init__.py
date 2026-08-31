@@ -13,6 +13,7 @@ from .document import Document, DocType, VerificationStatus
 from .employee_target import EmployeeTarget
 from .fraud_log import FraudLog
 from .notification import Notification
+from .product import Product, ProductCategory
 from .proposal import Proposal, ProposalWorkflowStatus
 from .user import User, UserRole
 
@@ -28,6 +29,8 @@ __all__ = [
     "EmployeeTarget",
     "FraudLog",
     "Notification",
+    "Product",
+    "ProductCategory",
     "Proposal",
     "ProposalWorkflowStatus",
     "User",

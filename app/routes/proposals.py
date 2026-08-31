@@ -16,6 +16,7 @@ from ..schemas.proposal_schema import (
     proposal_create_schema,
     proposal_detail_schema,
     proposal_response_schema,
+    proposal_update_schema,
     proposals_response_schema,
 )
 from ..services import proposal_service
@@ -108,6 +109,30 @@ def get_proposal(proposal_id: int):
         return _service_error(err)
 
     return jsonify(proposal_detail_schema.dump(proposal)), 200
+
+
+@proposals_bp.put("/proposals/<int:proposal_id>")
+@role_required(_ALL_ROLES)
+def update_proposal(proposal_id: int):
+    """Revise a proposal's product, amount, or notes.
+
+    Only permitted while the proposal is still in ``submitted`` or
+    ``rep_review``; the service rejects later stages with 422. Sales reps may
+    revise only their own proposals.
+    """
+    try:
+        data = proposal_update_schema.load(request.get_json(silent=True) or {})
+    except SchemaValidationError as err:
+        return _validation_error(err)
+
+    try:
+        proposal = proposal_service.update_proposal(
+            proposal_id, data, _current_user()
+        )
+    except ServiceError as err:
+        return _service_error(err)
+
+    return jsonify(proposal_response_schema.dump(proposal)), 200
 
 
 @proposals_bp.put("/proposals/<int:proposal_id>/advance")

@@ -9,7 +9,7 @@ import pytest
 
 from app import create_app
 from app.extensions import db as _db
-from app.models import User, UserRole
+from app.models import Product, ProductCategory, User, UserRole
 from app.utils.security import hash_password
 from app.utils import token_blocklist
 
@@ -25,6 +25,11 @@ STAFF_PASSWORD = "Staff@123"
 DISABLED_EMAIL = "disabled@test.local"
 DISABLED_PASSWORD = "Disabled@123"
 
+# A live catalog product, seeded for every test so proposal submissions have a
+# valid product_id without each test having to create one as admin first.
+SEED_PRODUCT_CODE = "PRD-1001"
+SEED_PRODUCT_NAME = "Teak Plantation Unit"
+
 
 @pytest.fixture
 def app():
@@ -36,6 +41,7 @@ def app():
     with app.app_context():
         _db.create_all()
         _seed_users()
+        _seed_products()
         yield app
         _db.session.remove()
         _db.drop_all()
@@ -83,6 +89,24 @@ def _seed_users():
         ),
     ]
     _db.session.add_all(users)
+    _db.session.commit()
+
+
+def _seed_products():
+    """One live, on-sale product so proposals can be submitted out of the box."""
+    _db.session.add(
+        Product(
+            product_code=SEED_PRODUCT_CODE,
+            name=SEED_PRODUCT_NAME,
+            category=ProductCategory.teak,
+            description="15-year teak growth unit.",
+            min_investment=50000,
+            max_investment=500000,
+            duration_months=180,
+            interest_rate=12.5,
+            is_active=True,
+        )
+    )
     _db.session.commit()
 
 
@@ -146,3 +170,9 @@ def user_id_by_email(app):
         return User.query.filter_by(email=email).one().id
 
     return _lookup
+
+
+@pytest.fixture
+def seed_product_id(app):
+    """The id of the product seeded for every test."""
+    return Product.query.filter_by(product_code=SEED_PRODUCT_CODE).one().id
