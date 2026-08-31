@@ -75,6 +75,10 @@ class BaseConfig:
     # are swapped in at Phase 6b).
     FRAUD_CNN_WEIGHTS = os.environ.get("FRAUD_CNN_WEIGHTS") or None
     FRAUD_SIAMESE_WEIGHTS = os.environ.get("FRAUD_SIAMESE_WEIGHTS") or None
+    # Bank of known-forgery embeddings built by ml_training.build_reference_bank.
+    # The Siamese detector needs BOTH this and FRAUD_SIAMESE_WEIGHTS to leave its
+    # mock path: weights alone give it nothing to compare an upload against.
+    FRAUD_REFERENCE_BANK = os.environ.get("FRAUD_REFERENCE_BANK") or None
 
     # --- CORS (locked down in Phase 11) ---
     CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")

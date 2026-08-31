@@ -315,13 +315,14 @@ model can spot a forgery; that is the CNN's job, and the CNN scores 0.830.
 Convergence by epoch 2 tells the same story: ImageNet features already separate
 two different photographs, so there was little left to learn.
 
-**This changes `_SIAMESE_CONCERN`.** The best separating cut-off measures
+**This changed `_SIAMESE_CONCERN`.** The best separating cut-off measures
 0.964–0.997 across epochs, because same-document pairs cluster just under 1.0.
-`app/services/fraud_service.py` currently sets `_SIAMESE_CONCERN = 0.7`, which
-was chosen against the deterministic mock. Against the trained embedder that
-lands in the empty gap between the two populations, so it will call a 0.7
-similarity "similar to a known document" when a real match measures ~0.99. If
-you wire the bank in (§5), raise it toward the measured cut-off.
+`app/services/fraud_service.py` used to set `_SIAMESE_CONCERN = 0.7`, chosen
+against the deterministic mock; against the trained embedder that lands in the
+empty gap between the two populations, calling a 0.7 similarity "similar to a
+known document" when a real match measures ~0.99. It is now **0.95** — see §5,
+which measures it against a real bank and adds the nuance that 0.495 is a
+*cross-kind* average.
 
 Note that `final_val` here describes the *saved* epoch, not the last one: the
 script reloads `best_state` before its closing evaluation. It did not always —
@@ -378,56 +379,57 @@ Embeds every image in `datasets/fraud/reference/` into
 `saved_models/reference_embeddings.pt` (a `[N, 512]` tensor) with provenance in
 the sibling JSON, including a warning about near-duplicate exemplars.
 
-### Wiring the Siamese bank into the app
+### Wiring the Siamese bank into the app — done
 
-**Trained Siamese weights alone change nothing.**
-`siamese_detector.highest_similarity` only uses the real model when weights
-exist *and* `known_embeddings` is non-empty, and `fraud_service.run_detectors`
-currently calls it with one argument:
+This used to be a list of steps to do by hand. It is now in the code:
 
-```python
-siamese_score = siamese_detector.highest_similarity(file_path)
-```
+| where | what |
+|---|---|
+| `app/config.py` | `FRAUD_REFERENCE_BANK` reads the env var, next to the two weight paths |
+| `app/services/fraud_service.py` | `_reference_embeddings()` loads the bank once per path per process and `run_detectors` passes it to `highest_similarity` |
+| `.env` | set `FRAUD_REFERENCE_BANK=ml_training/saved_models/reference_embeddings.pt` and restart |
 
-So the detector keeps returning its deterministic mock. Closing that gap is a
-deliberate runtime change, left for you to make and test:
+The cache is keyed by path rather than held in one global, so the test suite's
+several app instances cannot inherit each other's bank. A missing or unreadable
+bank logs and returns `None` instead of failing the upload — the detector then
+takes its mock path, exactly as before.
 
-1. Add the path to `app/config.py`, next to the other two weight settings:
+Two things this exposed, both fixed:
 
-   ```python
-   FRAUD_REFERENCE_BANK = os.getenv("FRAUD_REFERENCE_BANK")
-   ```
+* `highest_similarity` guarded its real path with `and known_embeddings:`, and
+  `bool()` on a `[N, 512]` tensor raises *"Boolean value of Tensor with more than
+  one value is ambiguous"*. The bank this script writes **is** such a tensor, so
+  the wiring above would have crashed every upload the moment it was configured.
+  Now guarded with `len(known_embeddings) > 0`, which works for a tensor and a
+  list alike.
+* `_SIAMESE_CONCERN` was `0.7`, chosen against mock scores. Measured against the
+  trained embedder it is now `0.95`; see the numbers below.
 
-2. Load it once per process in `app/services/fraud_service.py`:
+**Measured with a real 2-exemplar bank** (`nic-001-back`, then scoring other val
+images through `run_detectors`):
 
-   ```python
-   import functools, os
+| image | similarity |
+|---|---|
+| a different variant of the banked document | 0.980 |
+| genuine images of a *different* NIC card | 0.692 – 0.724 |
 
-   @functools.lru_cache(maxsize=1)
-   def _load_bank(path: str):
-       import torch
-       return list(torch.load(path, map_location="cpu"))
+So the useful cut-off is around 0.9, and `0.95` sits clear of both populations.
+Note this refines §4's figure: the 0.495 mean different-document similarity is an
+average across *kinds*, and a proposal page is nothing like a NIC card. Two
+different documents **of the same kind** sit near 0.70, because they share a
+layout. Set the threshold against that number, not the cross-kind mean.
 
-   def _known_embeddings():
-       path = current_app.config.get("FRAUD_REFERENCE_BANK")
-       if path and os.path.isfile(path):
-           return _load_bank(path)
-       return None
-   ```
+Those numbers came from a throwaway bank built for the test and then deleted.
+`datasets/fraud/reference/` still holds **0 exemplars**, so `FRAUD_REFERENCE_BANK`
+is deliberately unset in `.env` and the Siamese term is a mock in production
+today — which is why `evaluate_pipeline` (§8) reports it at AUC 0.474.
 
-3. Pass it through:
-
-   ```python
-   siamese_score = siamese_detector.highest_similarity(file_path, _known_embeddings())
-   ```
-
-4. Set `FRAUD_REFERENCE_BANK=ml_training/saved_models/reference_embeddings.pt`
-   and restart.
-
-The `lru_cache` means a rebuilt bank is only picked up after a restart — which
-is the same contract the two weight files already have. Note that
-`_SIAMESE_CONCERN` (0.7) was chosen against mock scores; re-check it against
-your `siamese_doc.metrics.json` once real similarities are flowing.
+Resist the temptation to fill the bank from the synthesized tampered variants to
+get it working. The 0.980 row above is the reason: a variant of a source document
+matches *any* image of that same document, genuine or not. A bank seeded from
+`datasets/fraud/tampered/` would flag every honest re-upload of the scans you
+trained on. The bank only means anything when its contents are documents you
+actually rejected.
 
 ---
 
@@ -571,6 +573,76 @@ once `evaluate_ocr` shows the template is actually better on your documents.
 
 ---
 
+## 8. Score what the API actually returns: `evaluate_pipeline`
+
+```powershell
+python -m ml_training.evaluate_pipeline              # balanced sample of 200
+python -m ml_training.evaluate_pipeline --limit 0    # every val image
+```
+
+The trainers tell you how good each *model* is. This tells you how good the
+**verdict** is, which is a different number. It calls
+`app.services.fraud_service.run_detectors` — the same function `POST /documents`
+reaches through `ocr_service` — inside a real app context, so every weight path,
+mock fallback and aggregate weight that applies to a live upload applies here
+too. Scored on the held-out `val` split, which is grouped by source scan, so
+nothing here contributed a variant to CNN training.
+
+Why the distinction matters: the verdict is a blend,
+
+```
+aggregate = 0.3*ELA + 0.4*CNN*100 + 0.3*Siamese*100
+```
+
+and a detector on its mock still contributes a number to that sum — stable per
+file, but unrelated to tampering. The script AUCs each term separately, so a mock
+shows up at ~0.5 and you can see what it costs. It also computes the aggregate
+with the Siamese term dropped and the rest renormalized, which answers the real
+question: *what if the unavailable detector simply did not vote, instead of
+voting at random?*
+
+**Measured on all 516 val images** (258 genuine, 258 tampered), with ELA and CNN
+real and Siamese on its mock:
+
+| signal | genuine | tampered | AUC |
+|---|---|---|---|
+| ELA (0-100) | 11.782 | 11.478 | 0.485 |
+| CNN P(tampered) | 0.259 | 0.682 | **0.830** |
+| Siamese similarity | 0.509 | 0.484 | 0.474 |
+| AGGREGATE (0-100) | 29.140 | 45.236 | 0.773 |
+| aggregate, no Siamese | 19.826 | 43.893 | **0.834** |
+
+Three findings worth acting on, all of them policy calls rather than bugs:
+
+* **The blend is diluting the one detector that works.** ELA measures 0.485 —
+  slightly *backwards*, i.e. no signal on these documents — and the Siamese mock
+  measures 0.474. Together they hold 60% of the weight, and the aggregate (0.773)
+  therefore scores **worse than the CNN alone** (0.830). Either populate the
+  reference bank (§5) so the Siamese term earns its 0.3, or re-weight toward the
+  CNN. BUILD_SPEC gives the 0.3/0.4/0.3 split as an "e.g.", so re-weighting is
+  permitted — but `tests/test_fraud_routes.py` asserts exact aggregates, so it is
+  a deliberate change, not a tweak.
+* **`FRAUD_FLAG_THRESHOLD=60` is calibrated for the mocks, not for the trained
+  CNN.** At 60: accuracy 0.620, precision 0.984, recall **0.244** — 63 of 258
+  tampered caught, 195 missed, 1 genuine false-flagged. The mocks used to spread
+  scores uniformly around 50, which made 60 look reasonable; the real CNN pushed
+  the whole distribution down. Best cut-off on this sample is **42.63** (accuracy
+  0.769), or 32.78 without the Siamese term (0.787). Where to land between "few
+  false alarms" and "catches most forgeries" is a business decision.
+* **Re-quantization is invisible to this pipeline.** Recall at 60 by operation:
+  splice 35%, textpatch 30%, copymove 23%, requant **0%**. A JPEG re-save leaves
+  no trace either detector currently looks for. By kind, `nic` (AUC 0.688) is
+  harder than `proposal` (0.785) — there are far fewer NIC source scans.
+
+Per-image detail lands in `datasets/pipeline_report.json`, including each term
+and both aggregates, so you can re-threshold offline without re-scoring.
+
+`--limit N` takes a label-balanced sample (0 = everything), `--seed` picks which
+one, `--config production` scores against production settings. It reads the
+dataset and config and writes one JSON file; it changes nothing.
+
+---
+
 ## Privacy
 
 `app/ai/training/` holds real identity documents — NIC numbers, full names,
@@ -600,6 +672,7 @@ python -m ml_training.train_cnn
 python -m ml_training.train_siamese
 #   -> paste the two printed FRAUD_*_WEIGHTS lines into .env, restart the app
 python -m ml_training.plot_metrics            # three PNGs in saved_models/
+python -m ml_training.evaluate_pipeline       # what the API now returns
 
 python -m ml_training.label_ocr              # then fill some JSON files in by hand
 python -m ml_training.label_ocr --status

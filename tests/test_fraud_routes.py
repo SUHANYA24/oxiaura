@@ -47,7 +47,9 @@ def set_scores(monkeypatch):
             "app.ai.fraud.cnn_classifier.predict_tamper_probability", lambda p: cnn
         )
         monkeypatch.setattr(
-            "app.ai.fraud.siamese_detector.highest_similarity", lambda p: siamese
+            "app.ai.fraud.siamese_detector.highest_similarity",
+            # Two-arg: run_detectors passes the reference bank through.
+            lambda p, known_embeddings=None: siamese,
         )
 
     return _apply

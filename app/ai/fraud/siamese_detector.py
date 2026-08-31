@@ -4,9 +4,13 @@ Embeds a document image and returns the highest cosine similarity against a set
 of known reference embeddings (e.g. templates of previously confirmed forgeries).
 A high similarity to a known-fraud template is itself suspicious.
 
-Trained embedding weights come from ``FRAUD_SIAMESE_WEIGHTS``; until Phase 6b
-provides them (and a populated reference set), ``highest_similarity`` returns a
-deterministic mock keyed on the file contents.
+Trained embedding weights come from ``FRAUD_SIAMESE_WEIGHTS`` and the reference
+set from ``FRAUD_REFERENCE_BANK`` (built by ``ml_training.build_reference_bank``,
+passed in by ``fraud_service.run_detectors``). **Both** are required: weights
+alone give the model nothing to compare an upload against. Phase 6b trained the
+weights but produced no bank — there are no confirmed forgeries to seed one with
+— so in practice ``highest_similarity`` still returns a deterministic mock keyed
+on the file contents. See ``ml_training/README.md`` sections 4 and 5.
 """
 
 from __future__ import annotations
@@ -78,7 +82,12 @@ def highest_similarity(file_path: str, known_embeddings=None) -> float:
     import os
 
     weights_path = current_app.config.get("FRAUD_SIAMESE_WEIGHTS")
-    if weights_path and os.path.isfile(weights_path) and known_embeddings:
+    # ``len`` rather than truthiness: the bank built by
+    # ml_training.build_reference_bank is a [N, 512] tensor, and bool() on a
+    # multi-element tensor raises "Boolean value of Tensor ... is ambiguous".
+    # A list of vectors works with either test; a tensor only with this one.
+    has_bank = known_embeddings is not None and len(known_embeddings) > 0
+    if weights_path and os.path.isfile(weights_path) and has_bank:
         import torch
 
         vector = embed(file_path, weights_path)
