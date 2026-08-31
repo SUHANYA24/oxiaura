@@ -56,6 +56,7 @@ backend/
 │   ├── routes/
 │   │   ├── __init__.py
 │   │   ├── auth.py
+│   │   ├── users.py
 │   │   ├── customers.py
 │   │   ├── documents.py
 │   │   ├── agreements.py
@@ -64,6 +65,7 @@ backend/
 │   │   └── reports.py
 │   ├── services/
 │   │   ├── auth_service.py
+│   │   ├── user_service.py
 │   │   ├── customer_service.py
 │   │   ├── ocr_service.py
 │   │   ├── fraud_service.py
@@ -257,6 +259,20 @@ All under `/api/v1/`.
 - `POST /auth/refresh` — refresh → new access token
 - `POST /auth/logout` — revoke token
 - `GET  /auth/me` — current user profile
+
+**Users** (operator account administration)
+- `GET  /users` — list (paginated, filter by role/branch/is_active/search) — management
+- `POST /users` — create an operator account (admin only)
+- `GET  /users/{id}` — detail + branch — management
+- `PUT  /users/{id}` — update profile, role, branch, activation (admin only)
+- `DELETE /users/{id}` — deactivate, i.e. clear `is_active` (admin only)
+- `POST /users/{id}/reset-password` — admin sets another user's password
+- `PUT  /users/me/password` — change your own password (any role)
+
+Users are never hard-deleted: five tables reference `users.id`, so `DELETE` clears
+`is_active`, which is also what blocks login. Two guards protect the admin role — a
+caller cannot change their own role or activation, and the last active admin cannot
+be demoted or deactivated.
 
 **Customers**
 - `GET  /customers` — list (paginated, filter by status/rep/search)

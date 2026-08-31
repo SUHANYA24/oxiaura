@@ -1,0 +1,141 @@
+{
+  "name": "proposal_front",
+  "doc_kind": "proposal",
+  "side": "front",
+  "reference_image": "app/ai/training/proposal/proposal-020-front.jpg",
+  "reference_size": [
+    1200,
+    1600
+  ],
+  "rotate": 0,
+  "fields": {
+    "proposal_no": {
+      "box": [
+        0.772,
+        0.01,
+        0.14,
+        0.022
+      ]
+    },
+    "agreement_no": {
+      "box": [
+        0.772,
+        0.031,
+        0.141,
+        0.023
+      ]
+    },
+    "customer_full_name": {
+      "box": [
+        0.223,
+        0.138,
+        0.692,
+        0.083
+      ]
+    },
+    "customer_name_with_initials": {
+      "box": [
+        0.223,
+        0.207,
+        0.694,
+        0.079
+      ]
+    },
+    "customer_address": {
+      "box": [
+        0.223,
+        0.276,
+        0.697,
+        0.079
+      ]
+    },
+    "customer_nic": {
+      "box": [
+        0.223,
+        0.345,
+        0.698,
+        0.044
+      ]
+    },
+    "customer_birthday": {
+      "box": [
+        0.223,
+        0.38,
+        0.699,
+        0.043
+      ]
+    },
+    "customer_tel_phone": {
+      "box": [
+        0.222,
+        0.415,
+        0.701,
+        0.043
+      ]
+    },
+    "customer_email": {
+      "box": [
+        0.222,
+        0.45,
+        0.702,
+        0.042
+      ]
+    },
+    "nominee_full_name": {
+      "box": [
+        0.22,
+        0.552,
+        0.708,
+        0.075
+      ]
+    },
+    "nominee_name_with_initials": {
+      "box": [
+        0.218,
+        0.624,
+        0.711,
+        0.074
+      ]
+    },
+    "nominee_address": {
+      "box": [
+        0.217,
+        0.695,
+        0.714,
+        0.074
+      ]
+    },
+    "nominee_nic": {
+      "box": [
+        0.217,
+        0.767,
+        0.715,
+        0.037
+      ]
+    },
+    "nominee_birthday": {
+      "box": [
+        0.217,
+        0.804,
+        0.717,
+        0.037
+      ]
+    },
+    "nominee_relationship": {
+      "box": [
+        0.217,
+        0.84,
+        0.721,
+        0.037
+      ]
+    },
+    "nominee_tel": {
+      "box": [
+        0.217,
+        0.877,
+        0.721,
+        0.038
+      ]
+    }
+  }
+}

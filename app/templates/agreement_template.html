@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Investment Agreement {{ agreement.agreement_number }}</title>
+  <style>
+    @page { size: A4; margin: 2cm; }
+    body { font-family: "Helvetica", "Arial", sans-serif; color: #1a1a1a; font-size: 12px; }
+    .letterhead { border-bottom: 3px solid #1b5e20; padding-bottom: 12px; margin-bottom: 24px;
+                  display: flex; justify-content: space-between; align-items: flex-start; }
+    .brand h1 { color: #1b5e20; margin: 0; font-size: 24px; letter-spacing: 1px; }
+    .brand p { margin: 2px 0 0; color: #555; font-size: 11px; }
+    .doc-title { text-align: center; font-size: 18px; font-weight: bold; margin: 8px 0 24px;
+                 text-transform: uppercase; letter-spacing: 2px; }
+    .meta { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    .meta td { padding: 6px 8px; border: 1px solid #ddd; vertical-align: top; }
+    .meta td.label { background: #f1f8e9; font-weight: bold; width: 32%; }
+    .terms { margin-top: 16px; line-height: 1.6; }
+    .terms h2 { font-size: 13px; color: #1b5e20; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+    .signatures { margin-top: 48px; display: flex; justify-content: space-between; }
+    .sig-block { width: 45%; }
+    .sig-line { border-top: 1px solid #333; margin-top: 40px; padding-top: 4px; text-align: center; font-size: 11px; }
+    .footer { margin-top: 40px; border-top: 1px solid #ddd; padding-top: 12px;
+              display: flex; justify-content: space-between; align-items: center; }
+    .footer .verify-note { font-size: 10px; color: #666; max-width: 70%; }
+    .footer img { width: 110px; height: 110px; }
+    .amount { font-weight: bold; color: #1b5e20; }
+  </style>
+</head>
+<body>
+  <div class="letterhead">
+    <div class="brand">
+      <h1>PlantVest</h1>
+      <p>Plantation Investment Partners</p>
+    </div>
+    <div style="text-align:right; font-size:11px; color:#555;">
+      <div><strong>Agreement No.</strong> {{ agreement.agreement_number }}</div>
+      <div><strong>Issued</strong> {{ issued_on }}</div>
+      <div><strong>Status</strong> {{ agreement.status.value | capitalize }}</div>
+    </div>
+  </div>
+
+  <div class="doc-title">Investment Agreement</div>
+
+  <table class="meta">
+    <tr><td class="label">Customer</td><td>{{ customer.full_name }} ({{ customer.customer_code }})</td></tr>
+    <tr><td class="label">NIC Number</td><td>{{ customer.nic_number }}</td></tr>
+    <tr><td class="label">Investment Amount</td><td class="amount">LKR {{ investment_amount }}</td></tr>
+    <tr><td class="label">Duration</td><td>{{ agreement.duration_months }} months</td></tr>
+    <tr><td class="label">Interest Rate</td><td>{{ agreement.interest_rate }}% per annum</td></tr>
+    <tr><td class="label">Prepared By</td><td>{{ creator.full_name }}</td></tr>
+  </table>
+
+  <div class="terms">
+    <h2>Terms &amp; Conditions</h2>
+    <p>
+      This agreement is entered into between PlantVest Plantation Investment Partners
+      ("the Company") and the customer named above ("the Investor"). The Investor agrees
+      to invest the sum of <span class="amount">LKR {{ investment_amount }}</span> for a
+      term of {{ agreement.duration_months }} months at an annual interest rate of
+      {{ agreement.interest_rate }}%.
+    </p>
+    <p>
+      Returns are calculated on the invested principal and disbursed in accordance with the
+      Company's plantation yield schedule. This document is a system-generated record; its
+      authenticity can be independently verified by scanning the QR code below.
+    </p>
+  </div>
+
+  <div class="signatures">
+    <div class="sig-block"><div class="sig-line">Investor Signature</div></div>
+    <div class="sig-block"><div class="sig-line">For PlantVest (Authorized Officer)</div></div>
+  </div>
+
+  <div class="footer">
+    <div class="verify-note">
+      <strong>Authenticity:</strong> Scan the QR code or visit the verification link to confirm
+      this agreement was issued by PlantVest. Any altered copy will fail verification.
+    </div>
+    {% if qr_data_uri %}<img src="{{ qr_data_uri }}" alt="Verification QR code">{% endif %}
+  </div>
+</body>
+</html>
