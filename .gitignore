@@ -20,6 +20,15 @@ instance/
 # Local file store
 uploads/
 
+# ML training data (Phase 6b)
+# Raw scans are real customer documents — NIC numbers, names, addresses,
+# signatures. They must never enter git history.
+app/ai/training/
+ml_training/datasets/
+
+# Calibration overlays are regenerable; the templates themselves are tracked.
+ml_training/templates/*.png
+
 # Databases
 *.sqlite
 *.sqlite3

@@ -9,7 +9,10 @@ confidence of the line it was recognized from.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import re
+import sys
 import threading
 
 import numpy as np
@@ -22,6 +25,32 @@ _reader_lock = threading.Lock()
 _LANGUAGES = ["en"]
 
 
+class _EncodeSafeStream(io.TextIOBase):
+    """Wraps a text stream, replacing characters it cannot encode.
+
+    EasyOCR's first-run model download prints a progress bar filled with U+2588
+    (a full block). On a Windows console using cp1252 that raises
+    ``UnicodeEncodeError`` *inside urlretrieve's report hook*, which aborts the
+    download and takes the whole request or script down with it. Substituting the
+    unencodable characters keeps the progress notice visible without letting a
+    cosmetic detail break OCR.
+    """
+
+    def __init__(self, stream):
+        self._stream = stream
+        self._encoding = getattr(stream, "encoding", None) or "utf-8"
+
+    def write(self, text: str) -> int:
+        safe = text.encode(self._encoding, errors="replace").decode(
+            self._encoding, errors="replace"
+        )
+        self._stream.write(safe)
+        return len(text)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+
 def get_reader():
     """Return a process-wide EasyOCR ``Reader`` (built on first call)."""
     global _reader
@@ -30,7 +59,10 @@ def get_reader():
             if _reader is None:
                 import easyocr  # imported lazily — heavy dependency
 
-                _reader = easyocr.Reader(_LANGUAGES, gpu=False)
+                # Only the construction is wrapped: that is the sole place
+                # EasyOCR writes to stdout on our behalf.
+                with contextlib.redirect_stdout(_EncodeSafeStream(sys.stdout)):
+                    _reader = easyocr.Reader(_LANGUAGES, gpu=False)
     return _reader
 
 

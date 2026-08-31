@@ -50,6 +50,11 @@ qrcode==7.4.2
 pandas==2.2.2
 openpyxl==3.1.5
 
+# --- Offline ML training charts (ml_training/plot_metrics.py only) ---
+# Never imported at request time. Safe to omit from a production install; only
+# `python -m ml_training.plot_metrics` needs it, and it says so if absent.
+matplotlib==3.9.2
+
 # --- Testing ---
 pytest==8.2.2
 pytest-flask==1.3.0

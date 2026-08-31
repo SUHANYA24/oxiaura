@@ -1,0 +1,149 @@
+{
+  "name": "proposal_back",
+  "doc_kind": "proposal",
+  "side": "back",
+  "reference_image": "app/ai/training/proposal/proposal-117-back.jpg",
+  "reference_size": [
+    1200,
+    1600
+  ],
+  "rotate": 0,
+  "fields": {
+    "proposal_no": {
+      "box": [
+        0.792,
+        0.063,
+        0.132,
+        0.019
+      ]
+    },
+    "agreement_no": {
+      "box": [
+        0.793,
+        0.081,
+        0.131,
+        0.019
+      ]
+    },
+    "product": {
+      "box": [
+        0.318,
+        0.119,
+        0.206,
+        0.055
+      ]
+    },
+    "mode_of_payment": {
+      "box": [
+        0.725,
+        0.116,
+        0.203,
+        0.058
+      ]
+    },
+    "deposited": {
+      "box": [
+        0.318,
+        0.174,
+        0.207,
+        0.056
+      ]
+    },
+    "period_months": {
+      "box": [
+        0.727,
+        0.172,
+        0.203,
+        0.056
+      ]
+    },
+    "account_number": {
+      "box": [
+        0.319,
+        0.292,
+        0.208,
+        0.037
+      ]
+    },
+    "account_holder_name": {
+      "box": [
+        0.727,
+        0.29,
+        0.211,
+        0.044
+      ]
+    },
+    "bank": {
+      "box": [
+        0.32,
+        0.33,
+        0.207,
+        0.043
+      ]
+    },
+    "branch": {
+      "box": [
+        0.727,
+        0.33,
+        0.211,
+        0.043
+      ]
+    },
+    "signature_date": {
+      "box": [
+        0.73,
+        0.498,
+        0.21,
+        0.04
+      ]
+    },
+    "employee_name": {
+      "box": [
+        0.228,
+        0.69,
+        0.311,
+        0.049
+      ]
+    },
+    "employee_code": {
+      "box": [
+        0.228,
+        0.731,
+        0.312,
+        0.05
+      ]
+    },
+    "employee_nic": {
+      "box": [
+        0.228,
+        0.772,
+        0.312,
+        0.048
+      ]
+    },
+    "supervisor_name": {
+      "box": [
+        0.66,
+        0.681,
+        0.316,
+        0.047
+      ]
+    },
+    "supervisor_code": {
+      "box": [
+        0.662,
+        0.721,
+        0.317,
+        0.048
+      ]
+    },
+    "supervisor_nic": {
+      "box": [
+        0.662,
+        0.762,
+        0.317,
+        0.048
+      ]
+    }
+  }
+}
