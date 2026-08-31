@@ -19,7 +19,7 @@ from sqlalchemy import select
 
 from ..extensions import db
 from ..models import Proposal, ProposalWorkflowStatus, User, UserRole
-from . import customer_service, notification_service
+from . import customer_service, notification_service, product_service
 from .errors import ForbiddenError, NotFoundError, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,11 @@ _DEFAULT_PER_PAGE = 20
 
 _S = ProposalWorkflowStatus
 _TERMINAL = {_S.approved, _S.rejected}
+
+# Stages at which the commercial terms may still be edited. Once head office has
+# the proposal, changing the product or amount underneath their review would
+# invalidate the decision they are making.
+_EDITABLE = {_S.submitted, _S.rep_review}
 
 # The non-branching transitions: current stage -> its single next stage.
 _LINEAR_NEXT = {_S.submitted: _S.rep_review, _S.rep_review: _S.ho_review}
@@ -49,23 +54,30 @@ def create_proposal(data: dict, current_user: User) -> Proposal:
     The owning ``sales_rep`` is derived from the customer's assignment, so a
     rep can only ever submit for their own customers (enforced by
     :func:`customer_service.get_customer`).
+
+    ``product_id`` must name a live, on-sale catalog product. Its name is copied
+    into ``product_type`` as a snapshot, so a later admin edit to the product
+    does not rewrite what this proposal recorded.
     """
     customer = customer_service.get_customer(data["customer_id"], current_user)
+    product = product_service.resolve_selectable_product(data["product_id"])
 
     proposal = Proposal(
         customer_id=customer.id,
         sales_rep_id=customer.assigned_rep_id,
+        product_id=product.id,
         proposed_amount=data["proposed_amount"],
-        product_type=data.get("product_type"),
+        product_type=product.name,
         notes=data.get("notes"),
         workflow_status=_S.submitted,
     )
     db.session.add(proposal)
     db.session.commit()
     logger.info(
-        "Proposal %s submitted for customer %s by user %s",
+        "Proposal %s submitted for customer %s (product %s) by user %s",
         proposal.id,
         customer.customer_code,
+        product.product_code,
         current_user.id,
     )
     return proposal
@@ -115,6 +127,46 @@ def get_proposal(proposal_id: int, current_user: User) -> Proposal:
         and proposal.sales_rep_id != current_user.id
     ):
         raise ForbiddenError("You do not have access to this proposal.")
+    return proposal
+
+
+def update_proposal(proposal_id: int, data: dict, current_user: User) -> Proposal:
+    """Revise a proposal's commercial terms before head office reviews it.
+
+    Row-level ownership is reused from :func:`get_proposal`, so a rep may only
+    revise their own proposals. Changing ``product_id`` re-validates the product
+    and re-takes the ``product_type`` snapshot.
+
+    :raises ValidationError: the proposal has moved past ``rep_review``, or the
+        chosen product is retired / off-sale.
+    :raises ForbiddenError: the caller does not own this proposal.
+    """
+    proposal = get_proposal(proposal_id, current_user)
+
+    if proposal.workflow_status not in _EDITABLE:
+        raise ValidationError(
+            f"A proposal under {proposal.workflow_status.value} can no longer be "
+            f"edited. Editable stages: "
+            f"{', '.join(s.value for s in (_S.submitted, _S.rep_review))}."
+        )
+
+    if "product_id" in data:
+        product = product_service.resolve_selectable_product(data["product_id"])
+        proposal.product_id = product.id
+        # Re-snapshot: the proposal now records the newly chosen product.
+        proposal.product_type = product.name
+
+    for field in ("proposed_amount", "notes"):
+        if field in data:
+            setattr(proposal, field, data[field])
+
+    db.session.commit()
+    logger.info(
+        "Proposal %s revised by user %s (fields: %s)",
+        proposal.id,
+        current_user.id,
+        ", ".join(sorted(data)) or "none",
+    )
     return proposal
 
 
