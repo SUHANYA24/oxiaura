@@ -38,3 +38,6 @@ htmlcov/
 .claude/
 graphify-out/
 claude.md
+docs/
+agreements/
+BUILD_SPEC.md

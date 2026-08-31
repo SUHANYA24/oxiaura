@@ -85,9 +85,39 @@ def html_to_pdf(html: str) -> bytes:
     return HTML(string=html, base_url=current_app.root_path).write_pdf()
 
 
+def _project_root() -> str:
+    """Repo root — ``current_app.root_path`` points at the ``app`` package."""
+    return os.path.dirname(current_app.root_path)
+
+
+def _agreements_folder() -> str:
+    """Absolute path to the configured agreements folder.
+
+    ``AGREEMENTS_FOLDER`` defaults to a *relative* path (``agreements``). A
+    relative path is written against the process CWD but read back against
+    ``app.root_path`` (``<repo>/app``) by ``send_file`` — the two halves land in
+    different directories. Anchoring the folder here keeps them together.
+    """
+    folder = current_app.config["AGREEMENTS_FOLDER"]
+    return folder if os.path.isabs(folder) else os.path.join(_project_root(), folder)
+
+
+def _resolve_pdf_path(stored: str) -> str:
+    """Return an absolute path for a stored ``pdf_path``.
+
+    Rows written before the folder was anchored hold a path relative to the CWD
+    the server happened to run from, so fall back to that if the anchored
+    location has nothing.
+    """
+    if os.path.isabs(stored):
+        return stored
+    anchored = os.path.join(_project_root(), stored)
+    return anchored if os.path.exists(anchored) else os.path.abspath(stored)
+
+
 def _store_pdf(pdf_bytes: bytes) -> str:
     """Write PDF bytes under ``AGREEMENTS_FOLDER`` with a UUID name; return the path."""
-    folder = current_app.config["AGREEMENTS_FOLDER"]
+    folder = _agreements_folder()
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{uuid.uuid4().hex}.pdf")
     with open(path, "wb") as handle:
@@ -183,9 +213,15 @@ def get_agreement(agreement_id: int, current_user: User) -> Agreement:
 def get_pdf_path(agreement_id: int, current_user: User) -> str:
     """Return the on-disk PDF path for an agreement, if it exists."""
     agreement = get_agreement(agreement_id, current_user)
-    if not agreement.pdf_path or not os.path.exists(agreement.pdf_path):
+    if not agreement.pdf_path:
         raise NotFoundError("Agreement PDF is not available.")
-    return agreement.pdf_path
+
+    # Always hand the route an absolute path: ``send_file`` resolves a relative
+    # one against ``app.root_path``, not the CWD the file was written under.
+    path = _resolve_pdf_path(agreement.pdf_path)
+    if not os.path.exists(path):
+        raise NotFoundError("Agreement PDF is not available.")
+    return path
 
 
 def verify_agreement(token: str) -> dict:

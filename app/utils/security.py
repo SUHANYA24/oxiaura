@@ -54,18 +54,6 @@ def _normalize_roles(roles: Iterable) -> set[str]:
 
 
 def role_required(allowed_roles: Iterable) -> Callable:
-    """Decorator: allow the view only for the listed roles.
-
-    Usage::
-
-        @role_required([UserRole.admin, UserRole.head_office_staff])
-        def view(): ...
-
-    Behaviour:
-      * No / invalid / expired / revoked token -> 401 (raised by
-        ``verify_jwt_in_request`` and formatted by the JWT error handlers).
-      * Valid token but role not permitted -> 403.
-    """
     allowed = _normalize_roles(allowed_roles)
 
     def decorator(fn: Callable) -> Callable:

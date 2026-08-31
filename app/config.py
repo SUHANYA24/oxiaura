@@ -13,6 +13,18 @@ def _bool_env(key: str, default: bool = False) -> bool:
     return os.environ.get(key, str(default)).lower() in {"1", "true", "yes", "on"}
 
 
+def _str_env(key: str, default: str) -> str:
+    """Return ``key`` from the environment, treating blank as unset.
+
+    ``.env`` files commonly carry placeholder lines such as ``TEST_DATABASE_URL=``.
+    ``os.environ.get`` would hand back ``""`` for those, which then fails deep
+    inside the consumer (e.g. SQLAlchemy: "Could not parse SQLAlchemy URL from
+    string ''"). Blank values fall back to the default instead.
+    """
+    value = os.environ.get(key)
+    return value.strip() if value and value.strip() else default
+
+
 class BaseConfig:
     """Settings shared by every environment."""
 
@@ -25,7 +37,7 @@ class BaseConfig:
     )
 
     # --- Database ---
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
+    SQLALCHEMY_DATABASE_URI = _str_env(
         "DATABASE_URL", "mysql+pymysql://user:password@localhost:3306/plantvest"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -35,7 +47,7 @@ class BaseConfig:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
 
     # --- Redis / Celery broker (wired in Phase 7) ---
-    REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_URL = _str_env("REDIS_URL", "redis://localhost:6379/0")
 
     # Celery moves OCR + fraud off the request thread. Broker and result backend
     # both use Redis; task results are kept so the job-status endpoint can poll.
@@ -82,9 +94,7 @@ class TestConfig(BaseConfig):
     DEBUG = True
     # Prefer an isolated test DB; fall back to in-memory SQLite so tests can run
     # without a MySQL instance.
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "TEST_DATABASE_URL", "sqlite:///:memory:"
-    )
+    SQLALCHEMY_DATABASE_URI = _str_env("TEST_DATABASE_URL", "sqlite:///:memory:")
 
     # Run Celery tasks synchronously in-process — no Redis broker/worker needed.
     # Eager results are stored in an in-memory backend so the job-status
