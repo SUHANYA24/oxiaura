@@ -43,10 +43,3 @@ htmlcov/
 .idea/
 .vscode/
 .DS_Store
-
-.claude/
-graphify-out/
-claude.md
-docs/
-agreements/
-BUILD_SPEC.md

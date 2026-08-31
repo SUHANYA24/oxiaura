@@ -25,6 +25,15 @@ class Proposal(db.Model):
         db.Integer, db.ForeignKey("users.id"), nullable=False
     )
     proposed_amount = db.Column(db.Numeric(14, 2), nullable=False)
+    # The catalog product this proposal is for. Nullable at the DB level only so
+    # that rows predating the catalog (which carry product_type alone) still
+    # load; the create schema requires it for every new proposal.
+    product_id = db.Column(
+        db.Integer, db.ForeignKey("products.id"), nullable=True, index=True
+    )
+    # Snapshot of the product name as it was when the proposal was submitted.
+    # Server-set, never client-supplied: products are admin-editable, so this is
+    # what preserves the historical record of what was actually proposed.
     product_type = db.Column(db.String(100), nullable=True)
     workflow_status = db.Column(
         db.Enum(ProposalWorkflowStatus),
@@ -38,6 +47,7 @@ class Proposal(db.Model):
 
     customer = db.relationship("Customer", back_populates="proposals")
     sales_rep = db.relationship("User", back_populates="proposals")
+    product = db.relationship("Product", back_populates="proposals")
 
     def __repr__(self) -> str:  # pragma: no cover - debug aid
         return f"<Proposal {self.id} {self.workflow_status.value}>"

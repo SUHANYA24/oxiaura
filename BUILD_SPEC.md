@@ -56,6 +56,7 @@ backend/
 │   ├── routes/
 │   │   ├── __init__.py
 │   │   ├── auth.py
+│   │   ├── users.py
 │   │   ├── customers.py
 │   │   ├── documents.py
 │   │   ├── agreements.py
@@ -64,6 +65,7 @@ backend/
 │   │   └── reports.py
 │   ├── services/
 │   │   ├── auth_service.py
+│   │   ├── user_service.py
 │   │   ├── customer_service.py
 │   │   ├── ocr_service.py
 │   │   ├── fraud_service.py
@@ -184,17 +186,44 @@ Build these nine tables as SQLAlchemy models. Types shown are the intent; use ap
 | status | enum | pending / active / cancelled |
 | signed_at | datetime | nullable |
 
+### `products`
+Admin-managed catalog of investment products. Reference data: reads are open to
+every authenticated role (a rep must be able to pick one), every write is
+admin-only. Never hard-deleted, because `proposals.product_id` references it.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | int PK | |
+| product_code | string(20) | unique, auto-generated, e.g. "PRD-1001" |
+| name | string(150) | indexed, unique among live rows (case-insensitive) |
+| category | enum | teak / agarwood / coconut / mixed / other |
+| description | text | nullable |
+| min_investment | decimal(14,2) | > 0 |
+| max_investment | decimal(14,2) | nullable; must be ≥ min_investment |
+| duration_months | int | > 0 |
+| interest_rate | float | percent per annum, ≥ 0 |
+| is_active | bool | default true — off-sale toggle, reversible |
+| is_deleted | bool | default false, indexed — retired, hidden from reads |
+| created_at | datetime | |
+| updated_at | datetime | `onupdate` |
+
 ### `proposals`
 | Column | Type | Notes |
 |---|---|---|
 | id | int PK | |
 | customer_id | int FK → customers.id | |
 | sales_rep_id | int FK → users.id | |
+| product_id | int FK → products.id | indexed; nullable in DB (pre-catalog rows), required by the create schema |
 | proposed_amount | decimal(14,2) | |
-| product_type | string(100) | |
+| product_type | string(100) | server-set snapshot of `products.name` at submission |
 | workflow_status | enum | submitted / rep_review / ho_review / approved / rejected |
 | notes | text | |
 | submitted_at | datetime | |
+
+`product_type` is deliberately *not* dropped in favour of the FK. Products are
+admin-editable, so the snapshot is what preserves what was actually proposed —
+`product_id` resolves to the product's current state, `product_type` to its name
+at the time. Clients never supply it.
 
 ### `employee_targets`
 | Column | Type | Notes |
@@ -227,6 +256,7 @@ Build these nine tables as SQLAlchemy models. Types shown are the intent; use ap
 - Customer 1—* Document
 - Customer 1—* Agreement
 - Customer 1—* Proposal
+- Product 1—* Proposal
 - Document 1—1 FraudLog
 
 ---
@@ -258,6 +288,20 @@ All under `/api/v1/`.
 - `POST /auth/logout` — revoke token
 - `GET  /auth/me` — current user profile
 
+**Users** (operator account administration)
+- `GET  /users` — list (paginated, filter by role/branch/is_active/search) — management
+- `POST /users` — create an operator account (admin only)
+- `GET  /users/{id}` — detail + branch — management
+- `PUT  /users/{id}` — update profile, role, branch, activation (admin only)
+- `DELETE /users/{id}` — deactivate, i.e. clear `is_active` (admin only)
+- `POST /users/{id}/reset-password` — admin sets another user's password
+- `PUT  /users/me/password` — change your own password (any role)
+
+Users are never hard-deleted: five tables reference `users.id`, so `DELETE` clears
+`is_active`, which is also what blocks login. Two guards protect the admin role — a
+caller cannot change their own role or activation, and the last active admin cannot
+be demoted or deactivated.
+
 **Customers**
 - `GET  /customers` — list (paginated, filter by status/rep/search)
 - `POST /customers` — register new
@@ -279,9 +323,22 @@ All under `/api/v1/`.
 - `GET  /agreements/{id}/pdf` — download PDF
 - `GET  /verify/{qr_token}` — **public** authenticity check
 
+**Products** (admin-managed investment catalog)
+- `GET  /products` — list (paginated, filter by category/is_active/search) — any role
+- `POST /products` — create (admin only)
+- `GET  /products/{id}` — detail + proposal_count — any role
+- `PUT  /products/{id}` — update, incl. the `is_active` off-sale toggle (admin only)
+- `DELETE /products/{id}` — soft delete, i.e. set `is_deleted` (admin only)
+
+Reads are open to every role because a sales rep has to pick a product when
+submitting a proposal; every write is admin-only. Products are never hard-deleted
+since proposals reference them. A duplicate name (case-insensitive, among live
+rows) returns 409.
+
 **Proposals**
-- `POST /proposals` — submit
+- `POST /proposals` — submit; `product_id` is required and must reference a live, on-sale product
 - `GET  /proposals` — list by status
+- `PUT  /proposals/{id}` — revise product / amount / notes, only while `submitted` or `rep_review`
 - `PUT  /proposals/{id}/advance` — move workflow stage
 
 **Employees / Reports**
@@ -406,6 +463,27 @@ All under `/api/v1/`.
 - Production config wired to env vars.
 - README with run instructions.
 **Acceptance check:** `docker-compose up` brings the whole stack online; health check passes.
+
+### Phase 13 — Product catalog & proposal linkage
+**Goal:** replace the free-text `proposals.product_type` with a real, admin-managed catalog.
+
+**Why:** nothing constrained `product_type`, nothing listed the available products, and
+two reps could spell the same product three different ways — so "which product sold"
+was not answerable from the data.
+
+**Build:**
+- `products` table + model (§2), enum category, `is_active` off-sale toggle and `is_deleted` soft delete.
+- Full vertical slice mirroring the customer module: `app/models/product.py`, `app/schemas/product_schema.py`, `app/services/product_service.py`, `app/routes/products.py`.
+- Reads open to all roles, every write `admin`-only via `role_required([UserRole.admin])`.
+- Auto `PRD-1001`-style codes; case-insensitive name uniqueness among live rows → 409.
+- `proposals.product_id` FK (nullable in DB for pre-catalog rows, required by the create schema). `product_type` becomes a server-set snapshot of the product name.
+- `PUT /proposals/{id}` to revise product / amount / notes, allowed only in `submitted` and `rep_review`.
+- Seed a starter catalog of three products in `seed.py`.
+
+**Acceptance check:** an admin can create a product and a `sales_rep` gets 200 on
+`GET /products` but 403 on `POST /products`; a proposal cannot be submitted without a
+valid, on-sale `product_id`; renaming a product leaves the `product_type` of an
+already-submitted proposal unchanged while its nested `product` reflects the new name.
 
 ---
 

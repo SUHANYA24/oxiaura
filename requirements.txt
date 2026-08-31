@@ -43,11 +43,17 @@ torchvision==0.18.1
 # --- PDF / QR ---
 Jinja2==3.1.4
 WeasyPrint==62.3
+pydyf==0.10.0            # pinned: pydyf>=0.11 removed Stream.transform, which WeasyPrint 62.3 calls
 qrcode==7.4.2
 
 # --- Reporting ---
 pandas==2.2.2
 openpyxl==3.1.5
+
+# --- Offline ML training charts (ml_training/plot_metrics.py only) ---
+# Never imported at request time. Safe to omit from a production install; only
+# `python -m ml_training.plot_metrics` needs it, and it says so if absent.
+matplotlib==3.9.2
 
 # --- Testing ---
 pytest==8.2.2

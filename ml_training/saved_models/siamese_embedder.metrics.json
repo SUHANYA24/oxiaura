@@ -1,0 +1,107 @@
+{
+  "best_epoch": 2,
+  "train_rows": 1560,
+  "val_rows": 516,
+  "pretrained": true,
+  "margin": 0.3,
+  "epochs_run": 8,
+  "final_val": {
+    "loss": 0.13336521945893764,
+    "mean_positive_similarity": 0.9916324988007545,
+    "mean_negative_similarity": 0.4951055784476921,
+    "pair_auc": 0.99853515625,
+    "best_threshold": 0.973,
+    "best_threshold_accuracy": 0.9765625,
+    "pairs": 128
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.1698451628908515,
+      "loss": 0.1487778928130865,
+      "mean_positive_similarity": 0.9867664510384202,
+      "mean_negative_similarity": 0.5366772336419672,
+      "pair_auc": 0.99755859375,
+      "best_threshold": 0.973,
+      "best_threshold_accuracy": 0.984375,
+      "pairs": 128
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.09028086951002479,
+      "loss": 0.13336521945893764,
+      "mean_positive_similarity": 0.9916324988007545,
+      "mean_negative_similarity": 0.4951055784476921,
+      "pair_auc": 0.99853515625,
+      "best_threshold": 0.973,
+      "best_threshold_accuracy": 0.9765625,
+      "pairs": 128
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.07167860394110903,
+      "loss": 0.1194633012637496,
+      "mean_positive_similarity": 0.9949184209108353,
+      "mean_negative_similarity": 0.4768606467405334,
+      "pair_auc": 0.9814453125,
+      "best_threshold": 0.983,
+      "best_threshold_accuracy": 0.953125,
+      "pairs": 128
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.07375967124244198,
+      "loss": 0.10294836480170488,
+      "mean_positive_similarity": 0.9955084072425961,
+      "mean_negative_similarity": 0.4336683959700167,
+      "pair_auc": 0.986083984375,
+      "best_threshold": 0.992,
+      "best_threshold_accuracy": 0.9375,
+      "pairs": 128
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.06957873748615384,
+      "loss": 0.10584625136107206,
+      "mean_positive_similarity": 0.9959381902590394,
+      "mean_negative_similarity": 0.4268024881603196,
+      "pair_auc": 0.986083984375,
+      "best_threshold": 0.991,
+      "best_threshold_accuracy": 0.9296875,
+      "pairs": 128
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.06791498127859086,
+      "loss": 0.10106593417003751,
+      "mean_positive_similarity": 0.9963959362357855,
+      "mean_negative_similarity": 0.41373295057564974,
+      "pair_auc": 0.9716796875,
+      "best_threshold": 0.986,
+      "best_threshold_accuracy": 0.9140625,
+      "pairs": 128
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.053199881920591,
+      "loss": 0.11680171731859446,
+      "mean_positive_similarity": 0.9965611081570387,
+      "mean_negative_similarity": 0.456265784392599,
+      "pair_auc": 0.968994140625,
+      "best_threshold": 0.964,
+      "best_threshold_accuracy": 0.890625,
+      "pairs": 128
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.04938921408029273,
+      "loss": 0.09635773720219731,
+      "mean_positive_similarity": 0.99809311889112,
+      "mean_negative_similarity": 0.40626008313847706,
+      "pair_auc": 0.98828125,
+      "best_threshold": 0.997,
+      "best_threshold_accuracy": 0.953125,
+      "pairs": 128
+    }
+  ]
+}

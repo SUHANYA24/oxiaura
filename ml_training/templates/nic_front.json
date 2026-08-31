@@ -1,0 +1,46 @@
+{
+  "name": "nic_front",
+  "doc_kind": "nic",
+  "side": "front",
+  "reference_image": "app/ai/training/nic/nic-002-front.jpeg",
+  "reference_size": [
+    1280,
+    904
+  ],
+  "rotate": 90,
+  "fields": {
+    "nic_number": {
+      "box": [
+        0.545,
+        0.285,
+        0.27,
+        0.065
+      ]
+    },
+    "name": {
+      "box": [
+        0.45,
+        0.625,
+        0.46,
+        0.06
+      ]
+    },
+    "sex": {
+      "box": [
+        0.872,
+        0.735,
+        0.112,
+        0.06
+      ],
+      "pad": 0.0
+    },
+    "date_of_birth": {
+      "box": [
+        0.755,
+        0.8,
+        0.2,
+        0.06
+      ]
+    }
+  }
+}

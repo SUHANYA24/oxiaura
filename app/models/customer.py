@@ -30,6 +30,11 @@ class Customer(db.Model):
         default=CustomerStatus.pending,
         nullable=False,
     )
+    # Soft-delete flag (admin-only DELETE). Deleted customers are hidden from
+    # all reads but retained for audit/history rather than physically removed.
+    is_deleted = db.Column(
+        db.Boolean, default=False, nullable=False, index=True
+    )
     registered_at = db.Column(
         db.DateTime, default=datetime.utcnow, nullable=False
     )
